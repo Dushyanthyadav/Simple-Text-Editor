@@ -4,12 +4,11 @@ use crossterm::event::{
     Event::{self, Key},
     KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
-use std::io::Error;
+use std::{env, io::Error};
 mod terminal;
+mod view;
 use terminal::{Terminal, Size, Position};
-
-const NAME: &str = env!("CARGO_PKG_NAME");
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use view::View;
 
 #[derive(Copy, Clone, Default)]
 struct Location {
@@ -21,14 +20,22 @@ struct Location {
 pub struct Editor {
     should_quit: bool,
     location: Location,
+    view: View,
 }
 
 impl Editor {
     pub fn run(&mut self) {
         Terminal::initialize().unwrap();
+        self.handle_args();
         let result = self.repl();
         Terminal::terminate().unwrap();
         result.unwrap();
+    }
+    fn handle_args(&mut self) {
+        let args: Vec<String> = env::args().collect();
+        if let Some(file_name) = args.get(1) {
+            self.view.load(file_name);
+        }
     }
     
     fn repl(&mut self) -> Result<(), Error> {
@@ -106,7 +113,7 @@ impl Editor {
             Terminal::clear_screen()?;
             Terminal::print("Goodbye. \r\n");
         } else {
-            Self::draw_rows()?;
+            self.view.render()?;
             Terminal::move_caret_to(Position {
                 col: self.location.x,
                 row: self.location.y,
@@ -116,38 +123,6 @@ impl Editor {
         Terminal::execute();
         Ok(())
     }
-    fn draw_welcome_message() -> Result<(), Error> {
-        let mut welcome_message = format!("{NAME} editor --version {VERSION}");
-        let width = Terminal::size()?.width as usize;
-        let len = welcome_message.len();
-        let padding = (width - len) / 2;
-        let spaces = " ".repeat(padding-1);
-        welcome_message = format!("~{spaces}{welcome_message}");
-        welcome_message.truncate(width);
-        Terminal::print(welcome_message);
-        Ok(())
-    }
-    fn draw_empty_row() -> Result<(), Error> {
-        Terminal::print("~");
-        Ok(())
-    }
-
-    fn draw_rows() -> Result<(), Error> {
-        let Size{height, ..} = Terminal::size()?;
-        for current_row in 0..height {
-            Terminal::clear_line()?;
-            if current_row == height / 3 {
-                Self::draw_welcome_message()?;
-            } else {
-                Self::draw_empty_row()?;
-            }
-            if current_row + 1 < height {
-                Terminal::print("\r\n")?;
-            }
-        }
-        Ok(())
-    }
-
 
 
 }
